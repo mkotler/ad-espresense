@@ -86,25 +86,39 @@ class ESPresense(mqtt.Mqtt):
 
                 # look at all of the attributes (rooms) and pick the minimum value
                 # if there aren't attributes yet, then just use current room
-                try:
-                    entity = self.get_entity(entity_id).get_state(attribute="all")
-                    attributes = entity['attributes']
-                    # self.lg(attributes)
-                    min_room = min(attributes, key=attributes.get)
-                except Exception:
-                    min_room = room
+                entity = self.get_entity(entity_id)
+                if entity is None:
+                    attributes = None
+                else:
+                    attributes = entity.get_state(attribute="all")['attributes']
+                    # update the latest distance in the attributes
+                    attributes[room] = distance
 
-                sensor_state = min_room
-
+                sensor_state = self.closest_room(attributes, room)
                 self.set_state(
                     entity_id=entity_id,
                     state=sensor_state,
                     attributes=sensor_attr,
                 )
 
-                log_string = f"entity_id: {entity_id}, state: {sensor_state}, attributes: {sensor_attr}"
+                log_string = (
+                    f"entity_id: {entity_id}, state: {sensor_state}, attributes: {sensor_attr}"
+                )
                 self.lg(log_string)
                 break
+
+    def closest_room(self, distances: dict, default: str) -> str:
+        """ Calculate the closest room based on distances passed in """
+        # distances is a dictionary of rooms with the value of each room is the distance
+
+        # start by just calculating minimum distance of available distances
+        minimum = (
+            min(distances, key=distances.get) if (distances is not None and len(distances) != 0)
+            else default
+        )
+        room = minimum if minimum is not None else default
+
+        return room
 
     def reset_callback(self, event: str, data: dict[str, str], _: dict[str, Any]) -> None:
         """Reset sensors when called from Home Assistant"""
